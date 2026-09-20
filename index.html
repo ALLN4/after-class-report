@@ -476,16 +476,15 @@
                             const y0 = Math.min(...words.map(word => word.y0));
                             const x1 = Math.max(...words.map(word => word.x1));
                             const y1 = Math.max(...words.map(word => word.y1));
-                            const averageHeight = words.reduce((sum, word) => sum + Math.max(1, word.y1 - word.y0), 0) / words.length;
-                            // 只过滤真正几乎贴住图片边界的文字；完整但裁得较紧的行仍然保留。
-                            const edgeTolerance = Math.max(2, Math.min(6, Math.round(averageHeight * 0.12)));
+                            // 只过滤真正贴到图片最外沿的文字；完整但裁得很紧的行仍然保留。
+                            const edgeTolerance = 1;
                             const touchesEdge = x0 <= edgeTolerance || y0 <= edgeTolerance || (width && x1 >= width - edgeTolerance) || (height && y1 >= height - edgeTolerance);
                             if (touchesEdge) {
                                 discardedLines += 1;
                                 discardedWords += words.length;
                                 return;
                             }
-                            const reliable = words.filter(word => Number.isFinite(word.confidence) && word.confidence >= 65);
+                            const reliable = words.filter(word => Number.isFinite(word.confidence) && word.confidence >= 40);
                             lowConfidenceDiscarded += words.length - reliable.length;
                             discardedWords += words.length - reliable.length;
                             if (reliable.length) keptLines.push(reliable.map(word => word.text).join(' '));
@@ -498,16 +497,15 @@
                     const safeWords = words.filter(word => {
                         const box = word && word.bbox;
                         const confidence = Number(word && word.confidence);
-                        if (!box || confidence < 65) return false;
-                        const wordHeight = Math.max(1, box.y1 - box.y0);
-                        const edgeTolerance = Math.max(2, Math.min(6, Math.round(wordHeight * 0.12)));
+                        if (!box || confidence < 40) return false;
+                        const edgeTolerance = 1;
                         return box.x0 > edgeTolerance && box.y0 > edgeTolerance && (!width || box.x1 < width - edgeTolerance) && (!height || box.y1 < height - edgeTolerance);
                     });
                     return {
                         text: safeWords.map(word => String(word.text || '').trim()).filter(Boolean).join(' '),
                         discarded: Math.max(0, words.length - safeWords.length),
                         discardedLines: 0,
-                        lowConfidenceDiscarded: words.filter(word => Number(word && word.confidence) < 65).length,
+                        lowConfidenceDiscarded: words.filter(word => Number(word && word.confidence) < 40).length,
                         detectedWords: words.length
                     };
                 },
