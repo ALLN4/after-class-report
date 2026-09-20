@@ -262,12 +262,25 @@
                     <div class="flex justify-between items-center">
                         <label class="block text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">💡 报告修改提示区</label>
                         <div class="flex items-center gap-1.5 flex-wrap justify-end">
-                            <button @click="generateAIContent(true, 'words')" :disabled="loading || !refineInstruction" :class="loading || !refineInstruction ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#5c8a5e] hover:bg-[#4a7c59]'" class="text-white text-[11px] font-bold px-2.5 py-1 rounded transition-all shadow">重生成词汇</button>
-                            <button @click="generateAIContent(true, 'sentences')" :disabled="loading || !refineInstruction" :class="loading || !refineInstruction ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#5c8a5e] hover:bg-[#4a7c59]'" class="text-white text-[11px] font-bold px-2.5 py-1 rounded transition-all shadow">重生成句型</button>
-                            <button @click="undoLast" x-show="history.length > 0" :disabled="loading" class="text-[11px] font-bold px-2.5 py-1 rounded transition-all shadow border border-gray-300 text-gray-600 hover:bg-gray-100">↩ 撤销</button>
+                            <button @click="generateAIContent(true, refineScope)" :disabled="loading || !refineInstruction" :class="loading || !refineInstruction ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#5c8a5e] hover:bg-[#4a7c59]'" class="text-white text-[11px] font-bold px-2.5 py-1 rounded transition-all shadow"><span x-text="loading ? '修改中…' : '按要求修改'"></span></button>
+                            <button @click="undoLast" x-show="history.length > 0" :disabled="loading" class="text-[11px] font-bold px-2.5 py-1 rounded transition-all shadow border border-gray-300 text-gray-600 hover:bg-gray-100">↩ 撤销上次修改</button>
                         </div>
                     </div>
-                    <textarea x-model="refineInstruction" rows="1" placeholder="在此输入您的修改意见（如：把单词例句换一个更简单的）。" class="w-full px-3 py-1.5 border border-emerald-200 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-xs font-sans bg-white text-gray-900"></textarea>
+                    <div class="flex gap-2">
+                        <select x-model="refineScope" class="w-36 shrink-0 px-2 py-1.5 border border-emerald-200 rounded bg-white text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#4a7c59]">
+                            <option value="smart">智能判断</option>
+                            <option value="word_meaning">词汇：释义</option>
+                            <option value="word_example">词汇：例句</option>
+                            <option value="word_usage">词汇：用法与搭配</option>
+                            <option value="specific_word">指定词汇</option>
+                            <option value="sentence_example">句型：例句</option>
+                            <option value="grammar_explanation">句型：语法解说</option>
+                            <option value="sentence_usage">句型：结构与用法</option>
+                            <option value="specific_sentence">指定句型或语法点</option>
+                            <option value="all">全部内容</option>
+                        </select>
+                        <textarea x-model="refineInstruction" rows="1" placeholder="例如：只把 take off 的例句改简单，其他内容不动。" class="flex-1 min-w-0 px-3 py-1.5 border border-emerald-200 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-xs font-sans bg-white text-gray-900"></textarea>
+                    </div>
                 </section>
 
 
@@ -306,6 +319,7 @@
                 ocrScriptPromise: null,
 
                 refineInstruction: '',
+                refineScope: 'smart',
                 difficulty: localStorage.getItem('report_difficulty') || '简单',
                 model: ['deepseek-chat', 'deepseek-reasoner'].includes(localStorage.getItem('report_model'))
                     ? localStorage.getItem('report_model')
@@ -418,6 +432,24 @@
                     return { text: unique.join('\n'), removed: String(text || '').split(/\r?\n/).filter(line => normalize(line)).length - unique.length };
                 },
 
+                discardClippedOCRWords(result, file) {
+                    const data = result && result.data ? result.data : {};
+                    const words = Array.isArray(data.words) ? data.words : [];
+                    const width = Number(data.imageSize && data.imageSize.width) || Number(file && file.width) || 0;
+                    const height = Number(data.imageSize && data.imageSize.height) || Number(file && file.height) || 0;
+                    const margin = 4;
+                    const clipped = new Set(words.filter(word => {
+                        const box = word && word.bbox;
+                        return box && (box.x0 <= margin || box.y0 <= margin || (width && box.x1 >= width - margin) || (height && box.y1 >= height - margin));
+                    }).map(word => String(word.text || '').trim()).filter(Boolean));
+                    let text = String(data.text || '');
+                    clipped.forEach(token => {
+                        const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        text = text.replace(new RegExp(`(^|\\s)${escaped}(?=\\s|$)`, 'giu'), '$1');
+                    });
+                    return { text: text.replace(/[ \t]+/g, ' ').replace(/^ +| +$/gm, '').trim(), discarded: clipped.size };
+                },
+
                 async copyOCRText() {
                     if (!this.ocrText.trim()) return;
                     try {
@@ -502,11 +534,14 @@
                             }
                         });
                         const recognizedTexts = [];
+                        let clippedDiscarded = 0;
                         for (let index = 0; index < this.screenshotFiles.length; index += 1) {
                             this.ocrCurrentPage = index + 1;
                             this.ocrStatus = `正在识别第 ${index + 1}/${this.screenshotFiles.length} 张截图…`;
                             const result = await worker.recognize(this.screenshotFiles[index]);
-                            const pageText = result && result.data ? String(result.data.text || '').trim() : '';
+                            const filtered = this.discardClippedOCRWords(result, this.screenshotFiles[index]);
+                            clippedDiscarded += filtered.discarded;
+                            const pageText = filtered.text;
                             if (pageText) recognizedTexts.push(pageText);
                         }
                         const deduped = this.dedupeOCRText(recognizedTexts.join('\n'));
@@ -516,6 +551,7 @@
                         if (text) {
                             const knowledgeChanged = this.applyOCRToKnowledge(text);
                             if (deduped.removed > 0) this.ocrStatus += ` 已自动去重 ${deduped.removed} 条重复内容。`;
+                            if (clippedDiscarded > 0) this.ocrStatus += ` 已舍弃 ${clippedDiscarded} 个贴近截图边缘、可能不完整的词，不作推测补全。`;
                             if (knowledgeChanged && this.apiMode && this.apiKey && !this.loading && !this.streaming) {
                                 this.ocrStatus += ' 正在自动补全 AI 细节…';
                                 this.generateAIContent(false).then(() => {
@@ -1036,8 +1072,18 @@
 重点句型与语法：${this.inputSentencesAndGrammar || '无'}
 `;
                     } else {
-                        const regenerateWords = scope === 'words' || scope === null;
-                        const regenerateSentences = scope === 'sentences' || scope === null;
+                        const wordScopes = ['word_meaning', 'word_example', 'word_usage', 'specific_word'];
+                        const sentenceScopes = ['sentence_example', 'grammar_explanation', 'sentence_usage', 'specific_sentence'];
+                        const regenerateWords = scope === 'smart' || scope === 'all' || scope == null || wordScopes.includes(scope);
+                        const regenerateSentences = scope === 'smart' || scope === 'all' || scope == null || sentenceScopes.includes(scope);
+                        const scopeLabels = {
+                            smart: '由修改意见智能判断，但只修改意见明确涉及的最小范围',
+                            word_meaning: '只修改词汇的中文释义', word_example: '只修改词汇例句',
+                            word_usage: '只修改词汇的用法与搭配', specific_word: '只修改意见中点名的词汇',
+                            sentence_example: '只修改句型或语法部分的例句', grammar_explanation: '只修改句型或语法解说',
+                            sentence_usage: '只修改句型结构与用法', specific_sentence: '只修改意见中点名的句型或语法点',
+                            all: '可按要求修改全部内容'
+                        };
 
                         let prevResult = '';
                         if (regenerateWords) {
@@ -1058,8 +1104,10 @@
 【先前的生成结果】
 ${prevResult}
 ${keepNote}
+【本次允许修改的范围】
+${scopeLabels[scope] || scopeLabels.smart}
 【修改指示】
-请在保留先前大体结构和其余完好内容的前提下，根据以下教师的修改意见进行精确修正：
+请根据以下教师的修改意见进行精确修正。必须只修改要求涉及的最小范围；没有被点名的词汇、释义、词性、音标、例句、用法、句型、结构和语法说明必须逐字保留，不得顺带润色、改写、删减、增加或重新排序：
 “${this.refineInstruction}”
 `;
                     }
@@ -1084,8 +1132,10 @@ ${keepNote}
                                 }
                             }
                         } else {
-                            const regenerateWords = scope === 'words' || scope === null;
-                            const regenerateSentences = scope === 'sentences' || scope === null;
+                            const wordScopes = ['word_meaning', 'word_example', 'word_usage', 'specific_word'];
+                            const sentenceScopes = ['sentence_example', 'grammar_explanation', 'sentence_usage', 'specific_sentence'];
+                            const regenerateWords = scope === 'smart' || scope === 'all' || scope == null || wordScopes.includes(scope);
+                            const regenerateSentences = scope === 'smart' || scope === 'all' || scope == null || sentenceScopes.includes(scope);
                             if (regenerateWords && !hasWords) {
                                 this.errorMessage = '词汇部分解析失败，已保留原来的词汇内容。';
                             } else if (regenerateWords) {
