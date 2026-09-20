@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>极速课后报告生成器</title>
     <!-- Tailwind CSS CDN -->
-    <script src="tailwindcss.js"></script>
+    <script src="tailwindcss.js" defer></script>
     <!-- Alpine.js CDN -->
     <script defer src="alpine.min.js"></script>
     <style>
@@ -230,8 +230,8 @@
                                     <option value="适中">适中</option>
                                     <option value="偏难">偏难</option>
                                 </select>
-                                <button type="button" @click="copyPromptAndOpenDeepSeek" :disabled="!inputWords.trim() && !inputSentencesAndGrammar.trim()" class="flex-1 min-w-0 rounded bg-[#4a7c59] px-3 py-1.5 text-xs font-bold text-white shadow transition-all hover:bg-[#3e6b4f] disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap">复制提示词并打开 DeepSeek</button>
-                                <button type="button" @click="pasteExternalAIResult" class="rounded border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm transition-all hover:bg-emerald-50 whitespace-nowrap">粘贴 AI 结果</button>
+                                <button x-show="!apiMode" type="button" @click="copyPromptAndOpenDeepSeek" :disabled="!inputWords.trim() && !inputSentencesAndGrammar.trim()" class="flex-1 min-w-0 rounded bg-[#4a7c59] px-3 py-1.5 text-xs font-bold text-white shadow transition-all hover:bg-[#3e6b4f] disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap">复制提示词并打开 DeepSeek</button>
+                                <button x-show="!apiMode" type="button" @click="pasteExternalAIResult" class="rounded border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm transition-all hover:bg-emerald-50 whitespace-nowrap">粘贴 AI 结果</button>
                                 <button x-show="apiMode" type="button" @click="generateAIContent(false)" :disabled="loading || !apiKey" :class="loading || !apiKey ? 'bg-gray-300' : 'bg-slate-600 hover:bg-slate-700'" class="rounded px-3 py-1.5 text-xs font-bold text-white shadow transition-all whitespace-nowrap"><span x-text="loading ? '自动补全中…' : 'API 自动补全'"></span></button>
                             </div>
                             <p x-show="freeAIStatus" class="mt-1 text-[10px]" :class="freeAIStatusTone" x-text="freeAIStatus"></p>
