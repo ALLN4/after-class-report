@@ -472,14 +472,16 @@
                         let discardedWords = 0;
                         let lowConfidenceDiscarded = 0;
                         groups.forEach(words => {
-                            // 按词而不是按整行过滤：某个词贴到图片外沿时，只舍弃该词，
-                            // 避免同一行其余完整、清晰的词也被连带删除。
-                            const edgeTolerance = 1;
+                            // 按词而不是按整行过滤。OCR 对残缺字形生成的文字框常会比实际
+                            // 截图边缘缩进数像素，因此使用小型自适应边缘区，而非只查最后 1px。
+                            // 命中时只舍弃该词，同一行其余完整内容仍然保留。
+                            const edgeToleranceX = width ? Math.max(3, Math.min(8, Math.round(width * 0.006))) : 3;
+                            const edgeToleranceY = height ? Math.max(4, Math.min(10, Math.round(height * 0.01))) : 4;
                             const reliable = words.filter(word => {
                                 const hasLowConfidence = !Number.isFinite(word.confidence) || word.confidence < 40;
-                                const touchesEdge = word.x0 <= edgeTolerance || word.y0 <= edgeTolerance ||
-                                    (width && word.x1 >= width - edgeTolerance) ||
-                                    (height && word.y1 >= height - edgeTolerance);
+                                const touchesEdge = word.x0 <= edgeToleranceX || word.y0 <= edgeToleranceY ||
+                                    (width && word.x1 >= width - edgeToleranceX) ||
+                                    (height && word.y1 >= height - edgeToleranceY);
                                 if (hasLowConfidence) lowConfidenceDiscarded += 1;
                                 if (hasLowConfidence || touchesEdge) discardedWords += 1;
                                 return !hasLowConfidence && !touchesEdge;
@@ -496,8 +498,9 @@
                         const box = word && word.bbox;
                         const confidence = Number(word && word.confidence);
                         if (!box || confidence < 40) return false;
-                        const edgeTolerance = 1;
-                        return box.x0 > edgeTolerance && box.y0 > edgeTolerance && (!width || box.x1 < width - edgeTolerance) && (!height || box.y1 < height - edgeTolerance);
+                        const edgeToleranceX = width ? Math.max(3, Math.min(8, Math.round(width * 0.006))) : 3;
+                        const edgeToleranceY = height ? Math.max(4, Math.min(10, Math.round(height * 0.01))) : 4;
+                        return box.x0 > edgeToleranceX && box.y0 > edgeToleranceY && (!width || box.x1 < width - edgeToleranceX) && (!height || box.y1 < height - edgeToleranceY);
                     });
                     return {
                         text: safeWords.map(word => String(word.text || '').trim()).filter(Boolean).join(' '),
