@@ -472,21 +472,19 @@
                         let discardedWords = 0;
                         let lowConfidenceDiscarded = 0;
                         groups.forEach(words => {
-                            const x0 = Math.min(...words.map(word => word.x0));
-                            const y0 = Math.min(...words.map(word => word.y0));
-                            const x1 = Math.max(...words.map(word => word.x1));
-                            const y1 = Math.max(...words.map(word => word.y1));
-                            // 只过滤真正贴到图片最外沿的文字；完整但裁得很紧的行仍然保留。
+                            // 按词而不是按整行过滤：某个词贴到图片外沿时，只舍弃该词，
+                            // 避免同一行其余完整、清晰的词也被连带删除。
                             const edgeTolerance = 1;
-                            const touchesEdge = x0 <= edgeTolerance || y0 <= edgeTolerance || (width && x1 >= width - edgeTolerance) || (height && y1 >= height - edgeTolerance);
-                            if (touchesEdge) {
-                                discardedLines += 1;
-                                discardedWords += words.length;
-                                return;
-                            }
-                            const reliable = words.filter(word => Number.isFinite(word.confidence) && word.confidence >= 40);
-                            lowConfidenceDiscarded += words.length - reliable.length;
-                            discardedWords += words.length - reliable.length;
+                            const reliable = words.filter(word => {
+                                const hasLowConfidence = !Number.isFinite(word.confidence) || word.confidence < 40;
+                                const touchesEdge = word.x0 <= edgeTolerance || word.y0 <= edgeTolerance ||
+                                    (width && word.x1 >= width - edgeTolerance) ||
+                                    (height && word.y1 >= height - edgeTolerance);
+                                if (hasLowConfidence) lowConfidenceDiscarded += 1;
+                                if (hasLowConfidence || touchesEdge) discardedWords += 1;
+                                return !hasLowConfidence && !touchesEdge;
+                            });
+                            if (!reliable.length && words.length) discardedLines += 1;
                             if (reliable.length) keptLines.push(reliable.map(word => word.text).join(' '));
                         });
                         return { text: keptLines.join('\n').trim(), discarded: discardedWords, discardedLines, lowConfidenceDiscarded, detectedWords: tsvRows.filter(row => row.split('\t').length >= 12 && Number(row.split('\t')[0]) === 5 && row.split('\t').slice(11).join('\t').trim()).length };
