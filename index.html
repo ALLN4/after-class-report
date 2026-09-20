@@ -35,32 +35,37 @@
             <div>
                 <h1 class="text-xl font-bold text-gray-800">极速课后报告生成器</h1>
             </div>
-            <!-- API Key 输入 -->
             <div class="flex flex-wrap items-center gap-2">
-                <span class="text-xs text-gray-600 font-semibold whitespace-nowrap">DeepSeek API Key:</span>
-                <input type="password" x-model="apiKey" @input="saveKey" placeholder="在此粘贴你的 sk-..." title="Key 仅保存在当前浏览器本地，不会写入报告内容" class="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] w-48 font-mono bg-white text-gray-900">
-                <a href="https://platform.deepseek.com/" target="_blank" class="text-xs text-gray-600 hover:text-gray-800 hover:underline">获取 Key</a>
-                <span class="text-[9px] text-gray-400 whitespace-nowrap">仅保存在本地</span>
+                <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">免费 DeepSeek 模式 · 无需 API Key</span>
 
-                <!-- AI 参数设置 -->
+                <!-- 可选的 API 自动模式 -->
                 <div class="relative" @click.outside="showSettings = false">
                     <button @click="showSettings = !showSettings"
                             :class="showSettings ? 'bg-emerald-100' : 'bg-white hover:bg-gray-50'"
                             class="w-7 h-7 rounded border border-gray-300 text-xs flex items-center justify-center"
-                            title="AI 参数设置">
+                            title="高级设置（可选 API 自动模式）">
                         ⚙️
                     </button>
                     <div x-show="showSettings" x-transition
                          class="absolute right-0 top-9 z-20 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-4 space-y-3 text-xs text-gray-700">
-                        <div class="font-bold text-gray-800">AI 参数设置</div>
-                        <div>
+                        <div class="font-bold text-gray-800">高级设置</div>
+                        <label class="flex items-start gap-2 rounded border border-emerald-100 bg-emerald-50/60 p-2">
+                            <input type="checkbox" x-model="apiMode" @change="saveSettings" class="mt-0.5">
+                            <span><strong class="block text-gray-700">启用 API 自动模式</strong><span class="text-[10px] text-gray-500">可选功能；默认免费模式不需要 Key。</span></span>
+                        </label>
+                        <div x-show="apiMode" class="space-y-1">
+                            <label class="block text-xs font-semibold text-gray-500">DeepSeek API Key</label>
+                            <input type="password" x-model="apiKey" @input="saveKey" placeholder="在此粘贴你的 sk-..." title="Key 仅保存在当前浏览器本地" class="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-xs font-mono bg-white text-gray-900">
+                            <div class="flex justify-between text-[9px] text-gray-400"><span>仅保存在当前浏览器</span><a href="https://platform.deepseek.com/" target="_blank" class="hover:text-gray-700 hover:underline">获取 Key</a></div>
+                        </div>
+                        <div x-show="apiMode">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">模型</label>
                             <select x-model="model" @change="saveSettings" class="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-sm bg-white text-gray-900">
                                 <option value="deepseek-chat">DeepSeek Chat（通用）</option>
                                 <option value="deepseek-reasoner">DeepSeek Reasoner（推理）</option>
                             </select>
                         </div>
-                        <div>
+                        <div x-show="apiMode">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">最大输出长度</label>
                             <select x-model.number="maxTokens" @change="saveSettings" class="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-sm bg-white text-gray-900">
                                 <option value="1500">1500</option>
@@ -74,7 +79,7 @@
         </header>
 
         <div class="mb-5 rounded-lg border border-emerald-100 bg-emerald-50/70 px-4 py-2 text-[11px] text-emerald-800 lg:shrink-0">
-            <span class="font-bold">使用流程：</span>识别并填入知识点 → AI 补全 → 填写学生信息 → 完成课堂评分 → 复制报告
+            <span class="font-bold">使用流程：</span>填写学生信息 → 完成课堂评分 → 识别并填入知识点 → 复制提示词到 DeepSeek → 粘贴结果 → 复制报告
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:flex-1 lg:min-h-0 lg:items-stretch">
@@ -178,7 +183,7 @@
                             <button type="button" @click="clearForm" title="清空本页报告内容（保留课堂评分、API 与显示设置）" class="border border-gray-300 bg-white hover:border-red-200 hover:bg-red-50 text-gray-500 hover:text-red-600 rounded px-2.5 py-1.5 text-[11px] font-semibold transition-all whitespace-nowrap">🧹 清空页面</button>
                         </div>
                     </div>
-                    <p x-show="!apiKey" class="text-[10px] text-amber-600">未填写 API Key：仍可使用手动录入、截图 OCR 和报告预览；填写 Key 后可使用 AI 补全。</p>
+                    <p class="text-[10px] text-emerald-700">免费模式无需 API Key：整理知识点后复制提示词到 DeepSeek，再把生成结果粘贴回来即可。</p>
 
                     <div class="rounded-lg border border-dashed border-emerald-300 bg-emerald-50/60 p-2.5 space-y-2">
                         <div class="flex items-center gap-2">
@@ -219,17 +224,20 @@
                         <div class="shrink-0">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">例句难度</label>
                             <div class="flex items-center gap-2">
-                                <select x-model="difficulty" @change="saveSettings" class="w-1/2 min-w-0 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-sm bg-white text-gray-900">
+                                <select x-model="difficulty" @change="saveSettings" class="w-24 shrink-0 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-sm bg-white text-gray-900">
                                     <option value="简单">简单</option>
                                     <option value="适中">适中</option>
                                     <option value="偏难">偏难</option>
                                 </select>
-                                <button type="button" @click="generateAIContent(false)"
-                                        :disabled="loading || !apiKey"
-                                        :class="loading ? 'bg-gray-300' : 'bg-[#4a7c59] hover:bg-[#3e6b4f]'"
-                                        class="text-white text-xs font-bold px-3 py-1.5 rounded transition-all flex items-center gap-1 shadow whitespace-nowrap">
-                                    <span x-text="loading ? 'AI 补全中…' : (aiWordsResult || aiSentencesAndGrammarResult ? '↻ 重新生成 AI 细节' : '🪄 生成 AI 细节')"></span>
-                                </button>
+                                <button type="button" @click="copyPromptAndOpenDeepSeek" :disabled="!inputWords.trim() && !inputSentencesAndGrammar.trim()" class="flex-1 min-w-0 rounded bg-[#4a7c59] px-3 py-1.5 text-xs font-bold text-white shadow transition-all hover:bg-[#3e6b4f] disabled:bg-gray-300 disabled:cursor-not-allowed whitespace-nowrap">复制提示词并打开 DeepSeek</button>
+                                <button type="button" @click="pasteExternalAIResult" class="rounded border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm transition-all hover:bg-emerald-50 whitespace-nowrap">粘贴 AI 结果</button>
+                                <button x-show="apiMode" type="button" @click="generateAIContent(false)" :disabled="loading || !apiKey" :class="loading || !apiKey ? 'bg-gray-300' : 'bg-slate-600 hover:bg-slate-700'" class="rounded px-3 py-1.5 text-xs font-bold text-white shadow transition-all whitespace-nowrap"><span x-text="loading ? '自动补全中…' : 'API 自动补全'"></span></button>
+                            </div>
+                            <p x-show="freeAIStatus" class="mt-1 text-[10px]" :class="freeAIStatusTone" x-text="freeAIStatus"></p>
+                            <div x-show="showImportPanel" x-transition class="mt-2 rounded border border-emerald-200 bg-emerald-50/50 p-2 space-y-2">
+                                <div class="flex items-center justify-between gap-2"><span class="text-[10px] font-semibold text-gray-600">在下方粘贴 DeepSeek 的完整回答</span><button type="button" @click="showImportPanel = false" class="text-[10px] text-gray-400 hover:text-gray-700">关闭</button></div>
+                                <textarea x-model="externalAIText" rows="4" placeholder="请保留 WORDS_START 和 SENTENCES_AND_GRAMMAR_START 等标记，再点击“导入报告”。" class="w-full resize-y rounded border border-emerald-200 bg-white px-2 py-1.5 text-[11px] font-mono text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#4a7c59]"></textarea>
+                                <div class="flex justify-end"><button type="button" @click="importExternalAIResult(externalAIText)" class="rounded bg-[#4a7c59] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#3e6b4f]">导入报告</button></div>
                             </div>
                         </div>
 
@@ -249,7 +257,7 @@
                 </section>
 
                 <!-- 报告修改提示区 -->
-                <section class="order-2 shrink-0 bg-[#f0f6f2] border border-emerald-200 p-3 rounded-lg space-y-2">
+                <section x-show="apiMode" class="order-2 shrink-0 bg-[#f0f6f2] border border-emerald-200 p-3 rounded-lg space-y-2">
                     <div class="flex justify-between items-center">
                         <label class="block text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">💡 报告修改提示区</label>
                         <div class="flex items-center gap-1.5 flex-wrap justify-end">
@@ -265,7 +273,7 @@
             </aside>
         </div>
 
-        <p class="mt-4 text-[10px] text-gray-400 text-center lg:shrink-0">快捷键：Ctrl+Enter 生成 · Ctrl+Shift+C 复制 · 全屏预览按 Esc 退出</p>
+        <p class="mt-4 text-[10px] text-gray-400 text-center lg:shrink-0">快捷键：Ctrl+Enter 复制提示词 · Ctrl+Shift+C 复制报告 · 全屏预览按 Esc 退出</p>
     </div>
 
     <!-- Alpine.js 逻辑控制 -->
@@ -306,6 +314,7 @@
                 previewFullscreen: false,
                 lastRequest: null,
                 showSettings: false,
+                apiMode: localStorage.getItem('report_api_mode') === 'true',
 
                 aiWordsResult: '',
                 aiSentencesAndGrammarResult: '',
@@ -314,6 +323,10 @@
                 streamText: '',
                 errorMessage: '',
                 history: [],
+                showImportPanel: false,
+                externalAIText: '',
+                freeAIStatus: '',
+                freeAIStatusTone: 'text-emerald-700',
 
                 copyStatus: '复制报告文本',
                 apiKey: localStorage.getItem('deepseek_api_key') || '',
@@ -323,6 +336,7 @@
                 },
 
                 saveSettings() {
+                    localStorage.setItem('report_api_mode', String(this.apiMode));
                     localStorage.setItem('report_model', this.model);
                     localStorage.setItem('report_max_tokens', String(this.maxTokens));
                     localStorage.setItem('report_difficulty', this.difficulty);
@@ -338,7 +352,8 @@
                     window.addEventListener('keydown', (e) => {
                         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                             e.preventDefault();
-                            this.generateAIContent(false);
+                            if (this.apiMode) this.generateAIContent(false);
+                            else this.copyPromptAndOpenDeepSeek();
                         }
                         if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
                             e.preventDefault();
@@ -480,15 +495,15 @@
                         this.ocrProgress = 100;
                         if (text) {
                             const knowledgeChanged = this.applyOCRToKnowledge(text);
-                            if (knowledgeChanged && this.apiKey && !this.loading && !this.streaming) {
+                            if (knowledgeChanged && this.apiMode && this.apiKey && !this.loading && !this.streaming) {
                                 this.ocrStatus += ' 正在自动补全 AI 细节…';
                                 this.generateAIContent(false).then(() => {
                                     this.ocrStatus = this.errorMessage
                                         ? '识别内容已自动填入；AI 补全未完成，可检查提示后点击“重新生成 AI 细节”。'
                                         : '识别内容已自动填入，AI 细节已自动补全。';
                                 });
-                            } else if (knowledgeChanged && !this.apiKey) {
-                                this.ocrStatus += ' 填写 API Key 后可点击“生成 AI 细节”。';
+                            } else if (knowledgeChanged && (!this.apiMode || !this.apiKey)) {
+                                this.ocrStatus += ' 可点击“复制提示词并打开 DeepSeek”免费补全。';
                             } else if (knowledgeChanged && (this.loading || this.streaming)) {
                                 this.ocrStatus += ' 当前已有 AI 任务，完成后可点击“重新生成 AI 细节”。';
                             }
@@ -834,6 +849,112 @@
                     };
                 },
 
+                buildFreeDeepSeekPrompt() {
+                    return [
+                        '你是一位专门面向6—12岁中国儿童的英语教师助手。',
+                        '',
+                        '请根据我提供的核心词汇、重点句型和语法内容，生成简洁、准确、适合家长和学生课后复习的英语学习内容。',
+                        '',
+                        '【生成要求】',
+                        '1. 不要写前言、总结、说明或教学建议。',
+                        '2. 不要遗漏我提供的任何核心词汇。',
+                        '3. 每个词汇必须包括：单词、美式音标、词性、中文意思、英文例句和例句的中文翻译。',
+                        '4. 每个句型必须包括：句型或表达、中文意思、搭配重点、英文例句和例句的中文翻译。',
+                        '5. 每个语法点必须包括：语法点名称、简短清晰的一句话解释、英文例句和例句的中文翻译。',
+                        '6. 自动区分句型和语法内容，内容适合6—12岁儿童。',
+                        '7. 不要使用 Markdown 表格，不要使用代码块包装结果。',
+                        '8. 必须严格保留下方四个标记，不要更改标记文字。',
+                        '',
+                        '【严格输出格式】',
+                        '###WORDS_START###',
+                        '• 单词 [美式音标] (词性) 中文意思',
+                        '  例句: 英文例句 (中文翻译)',
+                        '###WORDS_END###',
+                        '',
+                        '###SENTENCES_AND_GRAMMAR_START###',
+                        '• 句型或语法点 - 中文意思',
+                        '  搭配重点/语法解释: 简短的搭配说明或语法规则',
+                        '  例句: 英文例句 (中文翻译)',
+                        '###SENTENCES_AND_GRAMMAR_END###',
+                        '',
+                        '【本次输入内容】',
+                        '例句难度：' + this.difficulty,
+                        '',
+                        '核心词汇：',
+                        this.inputWords.trim() || '无',
+                        '',
+                        '重点句型与语法：',
+                        this.inputSentencesAndGrammar.trim() || '无'
+                    ].join('\n');
+                },
+
+                copyText(text) {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    let copied = false;
+                    try { copied = document.execCommand('copy'); } catch (e) {}
+                    document.body.removeChild(ta);
+                    return copied;
+                },
+
+                copyPromptAndOpenDeepSeek() {
+                    if (!this.inputWords.trim() && !this.inputSentencesAndGrammar.trim()) {
+                        alert('请先录入核心词汇或句型与语法重点。');
+                        return;
+                    }
+                    const copied = this.copyText(this.buildFreeDeepSeekPrompt());
+                    this.freeAIStatusTone = copied ? 'text-emerald-700' : 'text-red-600';
+                    this.freeAIStatus = copied
+                        ? '提示词已复制。请在 DeepSeek 中粘贴并发送，完成后复制完整回答，再返回点击“粘贴 AI 结果”。'
+                        : '浏览器未能自动复制，请允许剪贴板权限后重试。';
+                    window.open('https://chat.deepseek.com/', '_blank', 'noopener');
+                },
+
+                async pasteExternalAIResult() {
+                    this.showImportPanel = true;
+                    this.freeAIStatus = '';
+                    if (navigator.clipboard && window.isSecureContext) {
+                        try {
+                            const text = await navigator.clipboard.readText();
+                            if (text && text.trim()) {
+                                this.externalAIText = text;
+                                this.importExternalAIResult(text);
+                                return;
+                            }
+                        } catch (e) {}
+                    }
+                    this.freeAIStatusTone = 'text-amber-600';
+                    this.freeAIStatus = '浏览器未允许直接读取剪贴板，请在下方输入框按 Ctrl+V，再点击“导入报告”。';
+                },
+
+                importExternalAIResult(text) {
+                    const parsed = this.parseAISections(text);
+                    if (!parsed.words && !parsed.sentences) {
+                        this.freeAIStatusTone = 'text-red-600';
+                        this.freeAIStatus = '没有识别到规定的分区标记。请复制 DeepSeek 的完整回答，并确认其中包含 WORDS_START 和 SENTENCES_AND_GRAMMAR_START。';
+                        this.showImportPanel = true;
+                        return;
+                    }
+                    this.history.push({ words: this.aiWordsResult, sentences: this.aiSentencesAndGrammarResult });
+                    if (this.history.length > 5) this.history.shift();
+                    if (parsed.words) this.aiWordsResult = parsed.words;
+                    if (parsed.sentences) this.aiSentencesAndGrammarResult = parsed.sentences;
+                    this.externalAIText = String(text || '');
+                    this.errorMessage = '';
+                    const missing = [];
+                    if (!parsed.words) missing.push('核心词汇');
+                    if (!parsed.sentences) missing.push('句型与语法');
+                    this.freeAIStatusTone = missing.length ? 'text-amber-600' : 'text-emerald-700';
+                    this.freeAIStatus = missing.length
+                        ? '已导入可识别的部分；未识别到：' + missing.join('、') + '。原有内容已保留。'
+                        : 'DeepSeek 结果已成功导入，右侧报告预览已更新。';
+                    this.showImportPanel = false;
+                },
+
                 // 调用 DeepSeek 解析
                 async generateAIContent(isRefine = false, scope = null) {
                     if (this.loading) return;
@@ -1002,6 +1123,10 @@ ${keepNote}
                     this.history = [];
                     this.lastRequest = null;
                     this.copyStatus = '复制报告文本';
+                    this.showImportPanel = false;
+                    this.externalAIText = '';
+                    this.freeAIStatus = '';
+                    this.freeAIStatusTone = 'text-emerald-700';
                     this.togglePreviewFullscreen(false);
                     this.ocrCurrentPage = 0;
                     this.clearScreenshot();
