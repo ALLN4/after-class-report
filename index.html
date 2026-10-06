@@ -32,8 +32,11 @@
     <div class="max-w-7xl mx-auto px-6 py-8 lg:h-screen lg:flex lg:flex-col">
         <!-- 头部 -->
         <header class="mb-6 pb-4 border-b border-emerald-900/10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 lg:shrink-0">
-            <div>
+            <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 min-w-0">
                 <h1 class="text-xl font-bold text-gray-800">极速课后报告生成器</h1>
+                <div class="text-[10px] text-emerald-700/80 leading-relaxed">
+                    <span class="font-bold">使用流程：</span><span x-text="apiMode ? '识别并填入知识点 → AI 自动补全 → 填写学生信息 → 完成课堂评分 → 复制报告' : '识别并填入知识点 → 填写学生信息 → 完成课堂评分 → 复制提示词到 DeepSeek → 粘贴结果 → 复制报告'"></span>
+                </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700" x-text="apiMode ? 'API 自动模式 · 填写自己的 Key' : '免费 DeepSeek 模式 · 无需 API Key'"></span>
@@ -77,10 +80,6 @@
                 </div>
             </div>
         </header>
-
-        <div class="mb-5 rounded-lg border border-emerald-100 bg-emerald-50/70 px-4 py-2 text-[11px] text-emerald-800 lg:shrink-0">
-            <span class="font-bold">使用流程：</span><span x-text="apiMode ? '填写学生信息 → 完成课堂评分 → 识别并填入知识点 → AI 自动补全 → 复制报告' : '填写学生信息 → 完成课堂评分 → 识别并填入知识点 → 复制提示词到 DeepSeek → 粘贴结果 → 复制报告'"></span>
-        </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:flex-1 lg:min-h-0 lg:items-stretch">
             <!-- 右侧：课堂信息与反馈预览 -->
