@@ -121,6 +121,17 @@
                             </select>
                         </label>
                     </div>
+                    <div class="rounded border border-emerald-100 bg-emerald-50/40 px-2.5 py-2 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span aria-hidden="true" class="h-4"></span>
+                            <button type="button" @click="requestNewPerformanceTags" class="shrink-0 rounded border border-emerald-200 bg-white px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50">↻ 换一批</button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            <template x-for="tag in performanceTags" :key="tag">
+                                <button type="button" @click="togglePerformanceTag(tag)" :class="selectedPerformanceTags.includes(tag) ? 'bg-[#e4f2e7] border-[#4a7c59] text-[#2d6540]' : 'bg-white border-gray-200 text-gray-600'" class="w-full rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors" x-text="(selectedPerformanceTags.includes(tag) ? '✓ ' : '') + tag"></button>
+                            </template>
+                        </div>
+                    </div>
                 </section>
 
                 <div x-show="previewFullscreen" x-transition.opacity @click="togglePreviewFullscreen(false)" class="fixed inset-0 z-40 bg-black/35"></div>
@@ -301,6 +312,51 @@
                 readingVal: '良好',
                 speakingVal: '良好',
                 ratingOptions: ['优秀', '良好', '不错', '待提升'],
+                performanceTags: [],
+                selectedPerformanceTags: [],
+                performanceTagPool: [
+                    '对绘本格外有兴趣', '能感受到人物情绪', '愿意主动猜测故事发展', '能够注意画面细节',
+                    '愿意表达自己对角色的看法', '能联系自己的生活经验', '能够根据插图预测内容', '遇到新词时愿意主动尝试',
+                    '复述故事时有较好的条理性', '能够理解故事中的情感变化', '愿意使用完整句子表达', '能够发现前后页线索',
+                    '对故事细节保持好奇', '能够耐心听完并回应问题', '愿意分享自己的独特想法', '能根据上下文理解词义'
+                ],
+                performanceTagDimension: {
+                    '对绘本格外有兴趣': 'interest', '对故事细节保持好奇': 'interest', '愿意主动猜测故事发展': 'prediction',
+                    '能感受到人物情绪': 'emotion', '能够理解故事中的情感变化': 'emotion', '愿意表达自己对角色的看法': 'emotion',
+                    '能够注意画面细节': 'observation', '能够根据插图预测内容': 'prediction', '能够发现前后页线索': 'observation',
+                    '能联系自己的生活经验': 'connection', '遇到新词时愿意主动尝试': 'vocabulary', '能根据上下文理解词义': 'vocabulary',
+                    '复述故事时有较好的条理性': 'retelling', '愿意使用完整句子表达': 'expression', '愿意分享自己的独特想法': 'expression',
+                    '能够耐心听完并回应问题': 'learning'
+                },
+                encouragementByDimension: {
+                    interest: ['继续保持这份好奇心，探索更多精彩故事吧！', '愿你一直保有对阅读的热情和兴趣！', '期待你继续发现故事中的精彩之处！'],
+                    emotion: ['你的感受很细腻，期待你继续发现故事中的情感！', '相信你会越来越善于理解人物的心情！', '继续用心感受每一个故事中的温暖瞬间！'],
+                    prediction: ['大胆说出你的猜想，你的想法很有价值！', '期待你继续用线索发现故事里的惊喜！', '你的推理很有趣，继续保持这份探索精神！'],
+                    observation: ['你的观察很仔细，继续发现更多画面细节吧！', '保持这份细心，你会看到更多有趣的线索！', '期待你下一次分享更多精彩发现！'],
+                    expression: ['期待你下一次更加自信地表达自己的想法！', '你的分享让故事变得更加精彩，继续加油！', '相信你会越来越勇敢地表达自己的理解！'],
+                    retelling: ['继续练习讲述，你会成为更棒的故事讲述者！', '期待你下一次带来更加完整、精彩的复述！', '你的表达越来越有条理了，继续保持！'],
+                    vocabulary: ['遇到新词愿意尝试很棒，继续保持这份主动！', '相信你会在阅读中积累越来越多的新词！', '继续大胆猜词义，你的阅读能力会越来越强！'],
+                    learning: ['你的认真和投入很棒，继续保持！', '保持耐心和专注，你会有越来越多的收获！', '期待你带着新的发现回到课堂！']
+                },
+                encouragementPool: [
+                    '继续加油！', '期待你的进步！', '期待你下一次课堂中有更多精彩表现！',
+                    '相信你会越来越勇敢地表达自己的想法！', '继续保持这份好奇心，探索更多精彩故事吧！',
+                    '你的认真和投入很棒，继续保持！', '期待你带着新的发现回到课堂！',
+                    '你的每一次尝试都值得肯定，继续保持！', '期待你把更多精彩想法分享给大家！',
+                    '相信你会在下一次阅读中发现更多有趣的细节！', '保持这份专注，你会有越来越多的收获！',
+                    '期待你继续用自己的方式讲述精彩故事！', '你的进步正在一点点发生，继续努力！',
+                    '愿你带着这份热情，继续享受阅读的乐趣！', '期待你下一次更加自信地表达！',
+                    '你对故事的理解很有自己的想法，继续探索吧！', '保持耐心和好奇，你会发现更多惊喜！',
+                    '期待你把今天的收获运用到下一次课堂中！', '你的分享让故事变得更加精彩，继续加油！',
+                    '相信坚持下去，你会成为更棒的故事讲述者！', '期待你继续发现文字和画面中的小秘密！',
+                    '你的专注力和想象力都很棒，继续保持！', '愿你每次阅读都有新的发现和收获！',
+                    '期待你下一次带来更加精彩的表达！', '继续相信自己的判断，大胆说出你的想法！',
+                    '你今天的投入很有感染力，期待下次见到更棒的你！', '每一次认真思考都会带来新的成长，继续努力！',
+                    '你的进步值得肯定，期待你继续挑战自己！', '愿你在故事中保持发现问题的勇气！',
+                    '期待你把课堂上的收获变成自己的能力！', '继续保持专注，你的表现会越来越稳定！',
+                    '你的想象力为故事增添了新的色彩，继续探索吧！', '相信你的坚持会带来更多令人惊喜的表现！'
+                ],
+                encouragementText: '继续加油！',
 
                 inputWords: '',
                 inputSentencesAndGrammar: '',
@@ -364,6 +420,8 @@
                 },
 
                 init() {
+                    this.refreshPerformanceTags(false);
+                    this.pickMonthlyEncouragement();
                     window.addEventListener('keydown', (e) => {
                         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                             e.preventDefault();
@@ -377,6 +435,56 @@
                     });
                     // 直接监听系统粘贴事件：用户按 Ctrl+V 时读取图片，不反复调用剪贴板权限接口。
                     window.addEventListener('paste', (event) => this.handleClipboardPaste(event));
+                },
+
+                refreshPerformanceTags(changeEncouragement = true) {
+                    const blocked = new Set();
+                    if (this.participationVal === '优秀') blocked.add('interest');
+                    if (this.speakingVal === '优秀') blocked.add('expression');
+                    if (this.readingVal === '优秀') blocked.add('vocabulary');
+                    if (this.focusVal === '优秀') blocked.add('learning');
+                    const available = this.performanceTagPool.filter(tag => !this.selectedPerformanceTags.includes(tag) && !blocked.has(this.performanceTagDimension[tag]));
+                    for (let i = available.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [available[i], available[j]] = [available[j], available[i]];
+                    }
+                    this.performanceTags = [...this.selectedPerformanceTags, ...available.slice(0, Math.max(0, 4 - this.selectedPerformanceTags.length))];
+                    if (changeEncouragement) this.pickMonthlyEncouragement();
+                },
+
+                requestNewPerformanceTags() {
+                    if (this.performanceTags.length && this.performanceTags.every(tag => this.selectedPerformanceTags.includes(tag))) {
+                        alert('请先取消一个标签，再换一批。');
+                        return;
+                    }
+                    this.refreshPerformanceTags(true);
+                },
+
+                togglePerformanceTag(tag) {
+                    if (this.selectedPerformanceTags.includes(tag)) {
+                        this.selectedPerformanceTags = this.selectedPerformanceTags.filter(item => item !== tag);
+                    } else if (this.selectedPerformanceTags.length < 4) {
+                        this.selectedPerformanceTags = [...this.selectedPerformanceTags, tag];
+                    }
+                    this.refreshPerformanceTags(false);
+                },
+
+                pickMonthlyEncouragement() {
+                    const now = new Date();
+                    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                    let used = [];
+                    try { used = JSON.parse(localStorage.getItem(`report_encouragements_${monthKey}`) || '[]'); } catch (e) {}
+                    const dimensions = [...new Set(this.selectedPerformanceTags.map(tag => this.performanceTagDimension[tag]).filter(Boolean))];
+                    const targeted = dimensions.flatMap(dimension => this.encouragementByDimension[dimension] || []);
+                    const source = targeted.length ? [...new Set([...targeted, ...this.encouragementPool])] : this.encouragementPool;
+                    let available = source.filter(text => !used.includes(text));
+                    if (!available.length) {
+                        used = [];
+                        available = [...source];
+                    }
+                    this.encouragementText = available[Math.floor(Math.random() * available.length)];
+                    used.push(this.encouragementText);
+                    localStorage.setItem(`report_encouragements_${monthKey}`, JSON.stringify(used));
                 },
 
                 focusPasteArea() {
@@ -912,7 +1020,10 @@
                     const p = this.participationVal || '未选';
                     const r = this.readingVal || '未选';
                     const s = this.speakingVal || '未选';
-                    return `${name}今天在课堂上专注状态${f}，课堂互动${p}，认读能力${r}，输出表现${s}。`;
+                    const tags = this.selectedPerformanceTags.length
+                        ? `${name}今天${this.selectedPerformanceTags.join('，')}。`
+                        : `${name}今天在本节课中表现认真。`;
+                    return `${name}今天在课堂上专注状态${f}，课堂互动${p}，认读能力${r}，输出表现${s}。${tags}${this.encouragementText}`;
                 },
 
                 getFallbackWords() {
@@ -1268,6 +1379,9 @@ ${scopeLabels[scope] || scopeLabels.smart}
                     this.externalAIText = '';
                     this.freeAIStatus = '';
                     this.freeAIStatusTone = 'text-emerald-700';
+                    this.selectedPerformanceTags = [];
+                    this.refreshPerformanceTags(false);
+                    this.pickMonthlyEncouragement();
                     this.togglePreviewFullscreen(false);
                     this.ocrCurrentPage = 0;
                     this.clearScreenshot();
