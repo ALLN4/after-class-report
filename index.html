@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>极速课后报告生成器</title>
-    <!-- Tailwind CSS CDN -->
+    <!-- 本地资源：避免首次打开时等待外部 CDN -->
+    <link rel="preload" href="tailwindcss.js" as="script">
+    <link rel="preload" href="alpine.min.js" as="script">
     <script src="tailwindcss.js" defer></script>
-    <!-- Alpine.js CDN -->
     <script defer src="alpine.min.js"></script>
     <style>
     body {
@@ -19,14 +20,14 @@
 <body class="min-h-screen font-sans text-gray-900" x-data="reportApp()">
     
     <script>
-        setTimeout(function () {
+        window.addEventListener('load', function () {
             if (!window.Alpine) {
                 var el = document.createElement('div');
                 el.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc2626;color:#fff;font-size:12px;padding:6px 12px;z-index:9999;text-align:center';
-                el.textContent = '页面依赖的在线资源（Tailwind / Alpine）加载失败，请检查网络后刷新页面。';
+                el.textContent = '页面依赖的本地组件加载失败，请刷新页面后重试。';
                 document.body.appendChild(el);
             }
-        }, 5000);
+        }, { once: true });
     </script>
 
     <div class="max-w-7xl mx-auto px-6 py-8 lg:h-screen lg:flex lg:flex-col">
