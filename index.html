@@ -214,7 +214,7 @@
                                     </div>
                                 </template>
                             </div>
-                            <button type="button" @click="runOCR" :disabled="!screenshotFiles.length || ocrBusy" class="shrink-0 bg-[#4a7c59] hover:bg-[#3e6b4f] disabled:bg-gray-300 text-white rounded px-2 py-1.5 text-[10px] font-semibold shadow-sm"><span x-text="ocrBusy ? '识别中…' : '重新识别'"></span></button>
+                            <button type="button" @click="runOCR" :disabled="!screenshotFiles.length || ocrBusy" class="shrink-0 bg-[#4a7c59] hover:bg-[#3e6b4f] disabled:bg-gray-300 text-white rounded px-2 py-1.5 text-[10px] font-semibold shadow-sm"><span x-text="ocrBusy ? '识别中…' : '重新识别截图'"></span></button>
                         </div>
 
                         <div x-show="ocrBusy" class="space-y-1 text-[10px] text-gray-500">
@@ -224,10 +224,6 @@
 
                         <div x-show="ocrStatus && !ocrBusy" :class="ocrStatusTone()" class="text-[10px] rounded px-2 py-1 whitespace-pre-wrap" x-text="ocrStatus"></div>
 
-                        <details x-show="ocrText.trim()" class="relative text-[10px] text-gray-500">
-                            <summary class="cursor-pointer select-none hover:text-[#4a7c59]">查看识别原文</summary>
-                            <pre class="absolute left-0 right-0 top-full z-20 mt-1 max-h-36 overflow-auto whitespace-pre-wrap break-words rounded border border-emerald-200 bg-white p-2 font-sans text-[10px] text-gray-600 shadow-lg" x-text="ocrText"></pre>
-                        </details>
                     </div>
 
                     <div class="flex flex-1 min-h-0 flex-col gap-2">
@@ -254,13 +250,13 @@
                         <div class="shrink-0">
                             <div class="flex items-center justify-between mb-1">
                                 <label class="block text-xs font-semibold text-gray-500">核心词汇（可用逗号、空格或换行分隔多个）</label>
-                                <span class="text-[10px] text-gray-400" x-text="getWordCountLabel()"></span>
+                                <span class="flex items-center gap-2 text-[10px] text-gray-400"><span x-show="ocrFilledWords" x-text="ocrFilledWords" class="text-emerald-600"></span><span x-text="getWordCountLabel()"></span></span>
                             </div>
                             <textarea x-model="inputWords" rows="2" placeholder="如: apple, banana\n或每行一个单词" class="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-sm bg-white text-gray-900"></textarea>
                         </div>
 
                         <div class="flex flex-1 min-h-0 flex-col">
-                            <label class="block text-xs font-semibold text-gray-500 mb-1">句型与语法重点（混合录入，可用分号或换行分隔）</label>
+                            <div class="flex items-center justify-between mb-1"><label class="block text-xs font-semibold text-gray-500">句型与语法重点（混合录入，可用分号或换行分隔）</label><span x-show="ocrFilledSentences" x-text="ocrFilledSentences" class="text-[10px] text-emerald-600"></span></div>
                             <textarea x-model="inputSentencesAndGrammar" rows="2" placeholder="例如: Do you like...?; Let's...; 名词复数词尾加s" class="w-full flex-1 min-h-[56px] resize-none px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-sm font-mono bg-white text-gray-900"></textarea>
                         </div>
                     </div>
@@ -358,6 +354,8 @@
 
                 inputWords: '',
                 inputSentencesAndGrammar: '',
+                ocrFilledWords: '',
+                ocrFilledSentences: '',
 
                 // 截图 OCR 状态（按需加载 Tesseract，未使用截图时不会额外请求资源）
                 screenshotFiles: [],
@@ -494,6 +492,24 @@
                 getWordCountLabel() {
                     const count = String(this.inputWords || '').split(/[,，;；\n]+/).map(item => item.trim()).filter(Boolean).length;
                     return count ? `已录入 ${count} 个词条${count > 20 ? '（建议分批生成）' : ''}` : '尚未录入词汇';
+                },
+
+                inspectKnowledgeInput() {
+                    const warnings = [];
+                    const words = String(this.inputWords || '').split(/[,，;；\n\s]+/).map(item => item.trim()).filter(Boolean);
+                    const sentences = String(this.inputSentencesAndGrammar || '').split(/[;；\n]+/).map(item => item.trim()).filter(Boolean);
+                    const suspicious = item => /[^a-zA-Z0-9'’\-\sÀ-ÿ一-龥?！。，,.!?]/.test(item) || /^(.)\1{2,}$/.test(item.replace(/\s/g, ''));
+                    const duplicates = list => list.filter((item, index) => list.findIndex(other => other.toLowerCase() === item.toLowerCase()) !== index);
+                    const duplicateWords = [...new Set(duplicates(words))];
+                    const duplicateSentences = [...new Set(duplicates(sentences))];
+                    const oddWords = words.filter(item => suspicious(item) || item.length > 45);
+                    const oddSentences = sentences.filter(item => suspicious(item) || item.length > 180);
+                    if (duplicateWords.length) warnings.push(`核心词汇存在重复：${duplicateWords.join('、')}`);
+                    if (duplicateSentences.length) warnings.push(`句型或语法点存在重复：${duplicateSentences.join('、')}`);
+                    if (oddWords.length) warnings.push(`核心词汇中有疑似乱码或异常长度：${oddWords.slice(0, 5).join('、')}`);
+                    if (oddSentences.length) warnings.push(`句型或语法点中有疑似乱码或异常长度内容：${oddSentences.slice(0, 3).join('、')}`);
+                    if (this.ocrStatus && /边缘|残缺|低可信度|未识别/.test(this.ocrStatus)) warnings.push('最近一次 OCR 结果包含边缘、残缺或低可信度提示，请先检查输入内容。');
+                    return warnings;
                 },
 
                 ocrStatusTone() {
@@ -738,8 +754,8 @@
                             }
                         } else {
                             this.ocrStatus = detectedOCRWords > 0
-                                ? `OCR 已识别到 ${detectedOCRWords} 个文字项，但均属于截图边缘可疑内容或低可信度结果，已全部舍弃且未作推测。请重新截图并保留完整字形。`
-                                : '未识别到文字，请检查截图中是否包含清晰、完整的文字。';
+                                ? `识别到 ${detectedOCRWords} 个文字项，但它们疑似贴近截图边缘或字形不完整，已全部舍弃。请保留完整字形后重新识别截图。`
+                                : '未识别到文字。请确认截图中包含清晰英文，并避免文字贴近截图边缘。';
                         }
                     } catch (error) {
                         console.error(error);
@@ -822,7 +838,7 @@
                     if (split.sentences) this.inputSentencesAndGrammar = this.appendUniqueText(this.inputSentencesAndGrammar, split.sentences, '\n');
 
                     if (!split.words && !split.sentences) {
-                        this.ocrStatus = '识别到文字，但未能自动分类。可展开“查看识别原文”并手动录入。';
+                        this.ocrStatus = '识别到文字，但未能自动分类。请直接在下方知识点输入框中补充。';
                         return false;
                     }
                     const addedWords = this.inputWords !== beforeWords;
@@ -831,6 +847,13 @@
                         this.ocrStatus = '识别完成；识别出的内容已经存在，未重复添加。';
                         return false;
                     }
+                    this.ocrFilledWords = addedWords ? '刚刚由 OCR 填入' : '';
+                    this.ocrFilledSentences = addedSentences ? '刚刚由 OCR 填入' : '';
+                    window.clearTimeout(this.ocrFilledTimer);
+                    this.ocrFilledTimer = window.setTimeout(() => {
+                        this.ocrFilledWords = '';
+                        this.ocrFilledSentences = '';
+                    }, 3000);
                     const targets = [addedWords ? '核心词汇' : '', addedSentences ? '句型与语法重点' : ''].filter(Boolean).join('和');
                     this.ocrStatus = `识别完成，已自动填入${targets}；请直接在下方检查和修改。`;
                     return true;
@@ -1141,6 +1164,8 @@
                         alert('请先录入核心词汇或句型与语法重点。');
                         return;
                     }
+                    const warnings = this.inspectKnowledgeInput();
+                    if (warnings.length && !confirm(`录入内容检查到以下问题：\n\n${warnings.join('\n')}\n\n仍要复制提示词并继续吗？`)) return;
                     const copied = this.copyText(this.buildFreeDeepSeekPrompt());
                     this.freeAIStatusTone = copied ? 'text-emerald-700' : 'text-red-600';
                     this.freeAIStatus = copied
@@ -1204,6 +1229,10 @@
                     if (isRefine && !this.refineInstruction) {
                         alert('请先在修改提示区输入修改意见。');
                         return;
+                    }
+                    if (!isRefine) {
+                        const warnings = this.inspectKnowledgeInput();
+                        if (warnings.length && !confirm(`录入内容检查到以下问题：\n\n${warnings.join('\n')}\n\n仍要继续 AI 自动补全吗？`)) return;
                     }
 
                     this.loading = true;
