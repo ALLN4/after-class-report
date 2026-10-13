@@ -499,12 +499,14 @@
                     const warnings = [];
                     const words = String(this.inputWords || '').split(/[,，;；\n\s]+/).map(item => item.trim()).filter(Boolean);
                     const sentences = String(this.inputSentencesAndGrammar || '').split(/[;；\n]+/).map(item => item.trim()).filter(Boolean);
-                    const suspicious = item => /[^a-zA-Z0-9'’\-\sÀ-ÿ一-龥?！。，,.!?]/.test(item) || /^(.)\1{2,}$/.test(item.replace(/\s/g, ''));
+                    const suspiciousWord = item => /[^a-zA-Z0-9'’\-\sÀ-ÿ一-龥?！。，,.!?]/.test(item) || /^(.)\1{2,}$/.test(item.replace(/\s/g, ''));
+                    // 句型/语法区允许常见的并列、对比、括号和标点符号。
+                    const suspiciousSentence = item => /[^a-zA-Z0-9'’\-–—\sÀ-ÿ一-龥?！。，,.、/:：()（）＋+]/.test(item) || /^(.)\1{2,}$/.test(item.replace(/\s/g, ''));
                     const duplicates = list => list.filter((item, index) => list.findIndex(other => other.toLowerCase() === item.toLowerCase()) !== index);
                     const duplicateWords = [...new Set(duplicates(words))];
                     const duplicateSentences = [...new Set(duplicates(sentences))];
-                    const oddWords = words.filter(item => suspicious(item) || item.length > 45);
-                    const oddSentences = sentences.filter(item => suspicious(item) || item.length > 180);
+                    const oddWords = words.filter(item => suspiciousWord(item) || item.length > 45);
+                    const oddSentences = sentences.filter(item => suspiciousSentence(item) || item.length > 180);
                     if (duplicateWords.length) warnings.push(`核心词汇存在重复：${duplicateWords.join('、')}`);
                     if (duplicateSentences.length) warnings.push(`句型或语法点存在重复：${duplicateSentences.join('、')}`);
                     if (oddWords.length) warnings.push(`核心词汇中有疑似乱码或异常长度：${oddWords.slice(0, 5).join('、')}`);
