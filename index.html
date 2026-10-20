@@ -370,6 +370,8 @@
                 ocrCurrentPage: 0,
                 ocrBusy: false,
                 ocrScriptPromise: null,
+                ocrRunId: 0,
+                activeOCRWorker: null,
 
                 refineInstruction: '',
                 refineScope: 'smart',
@@ -389,6 +391,8 @@
                 loading: false,
                 streaming: false,
                 streamText: '',
+                aiRunId: 0,
+                activeAIController: null,
                 errorMessage: '',
                 history: [],
                 showImportPanel: false,
@@ -702,15 +706,18 @@
 
                 async runOCR() {
                     if (!this.screenshotFiles.length || this.ocrBusy) return;
+                    const runId = ++this.ocrRunId;
                     this.ocrBusy = true;
                     this.ocrProgress = 0;
                     this.ocrStatus = `正在加载 OCR 组件（共 ${this.screenshotFiles.length} 张）…`;
                     let worker = null;
                     try {
                         const Tesseract = await this.loadTesseract();
+                        if (runId !== this.ocrRunId) return;
                         this.ocrStatus = `正在识别第 1/${this.screenshotFiles.length} 张截图…`;
                         worker = await Tesseract.createWorker('eng+chi_sim', 1, {
                             logger: (message) => {
+                                if (runId !== this.ocrRunId) return;
                                 if (typeof message.progress === 'number') {
                                     const pageWeight = 100 / this.screenshotFiles.length;
                                     const currentPage = Number(this.ocrCurrentPage || 1) - 1;
@@ -719,6 +726,12 @@
                                 if (message.status) this.ocrStatus = this.ocrStatusFor(message.status);
                             }
                         });
+                        if (runId !== this.ocrRunId) {
+                            await worker.terminate();
+                            worker = null;
+                            return;
+                        }
+                        this.activeOCRWorker = worker;
                         const recognizedTexts = [];
                         let clippedDiscarded = 0;
                         let clippedLinesDiscarded = 0;
@@ -728,6 +741,7 @@
                             this.ocrStatus = `正在识别第 ${index + 1}/${this.screenshotFiles.length} 张截图…`;
                             const dimensions = await this.getImageDimensions(this.screenshotFiles[index]);
                             const result = await worker.recognize(this.screenshotFiles[index], {}, { text: true, tsv: true, blocks: true });
+                            if (runId !== this.ocrRunId) return;
                             const filtered = this.discardClippedOCRWords(result, dimensions);
                             clippedDiscarded += filtered.discarded;
                             clippedLinesDiscarded += filtered.discardedLines;
@@ -761,14 +775,18 @@
                                 : '未识别到文字。请确认截图中包含清晰英文，并避免文字贴近截图边缘。';
                         }
                     } catch (error) {
+                        if (runId !== this.ocrRunId) return;
                         console.error(error);
                         this.ocrStatus = 'OCR 失败：' + (error && error.message ? error.message : '未知错误') + '。建议裁剪掉无关背景、提高截图清晰度，或直接在下方知识点输入框中录入。';
                     } finally {
                         if (worker) {
                             try { await worker.terminate(); } catch (e) { console.warn(e); }
                         }
-                        this.ocrBusy = false;
-                        this.ocrCurrentPage = 0;
+                        if (this.activeOCRWorker === worker) this.activeOCRWorker = null;
+                        if (runId === this.ocrRunId) {
+                            this.ocrBusy = false;
+                            this.ocrCurrentPage = 0;
+                        }
                     }
                 },
 
@@ -939,8 +957,9 @@
                     return missing.length ? '以下词汇未在 AI 结果中生成：' + missing.join('、') : '';
                 },
 
-                async callDeepSeek(systemPrompt, userPrompt) {
+                async callDeepSeek(systemPrompt, userPrompt, runId) {
                     const controller = new AbortController();
+                    this.activeAIController = controller;
                     const timer = setTimeout(() => controller.abort(), 120000);
                     try {
                         const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -1030,6 +1049,7 @@
                         return fullText; */
                     } finally {
                         clearTimeout(timer);
+                        if (this.activeAIController === controller) this.activeAIController = null;
                     }
                 },
 
@@ -1238,6 +1258,7 @@
                         if (warnings.length && !confirm(`录入内容检查到以下问题：\n\n${warnings.join('\n')}\n\n仍要继续 AI 自动补全吗？`)) return;
                     }
 
+                    const runId = ++this.aiRunId;
                     this.loading = true;
                     this.errorMessage = '';
                     this.lastRequest = { isRefine, scope, kind: 'generate' };
@@ -1324,7 +1345,8 @@ ${scopeLabels[scope] || scopeLabels.smart}
                     }
 
                     try {
-                        const resultText = await this.callDeepSeek(systemPrompt, userPrompt);
+                        const resultText = await this.callDeepSeek(systemPrompt, userPrompt, runId);
+                        if (runId !== this.aiRunId) return;
                         const parsed = this.parseAISections(resultText);
                         const hasWords = Boolean(parsed.words);
                         const hasSentences = Boolean(parsed.sentences);
@@ -1364,6 +1386,7 @@ ${scopeLabels[scope] || scopeLabels.smart}
                         }
 
                     } catch (error) {
+                        if (runId !== this.aiRunId) return;
                         console.error(error);
                         if (error.name === 'AbortError') {
                             this.errorMessage = '请求超时（120 秒），请检查网络后重试。';
@@ -1371,9 +1394,11 @@ ${scopeLabels[scope] || scopeLabels.smart}
                             this.errorMessage = '调用 DeepSeek AI 失败：' + error.message;
                         }
                     } finally {
-                        this.streaming = false;
-                        this.streamText = '';
-                        this.loading = false;
+                        if (runId === this.aiRunId) {
+                            this.streaming = false;
+                            this.streamText = '';
+                            this.loading = false;
+                        }
                     }
                 },
 
@@ -1386,14 +1411,19 @@ ${scopeLabels[scope] || scopeLabels.smart}
                 },
 
                 clearForm() {
-                    if (this.streaming) {
-                        alert('AI 内容生成中，请稍候再清空。');
-                        return;
+                    // 后台标签页可能会暂停网络请求或 OCR Worker。清空时直接取消旧任务，
+                    // 并递增任务代号，防止页面恢复后旧结果重新写入已清空的表单。
+                    this.aiRunId += 1;
+                    if (this.activeAIController) this.activeAIController.abort();
+                    this.activeAIController = null;
+                    this.ocrRunId += 1;
+                    if (this.activeOCRWorker) {
+                        try { this.activeOCRWorker.terminate(); } catch (e) { console.warn(e); }
                     }
-                    if (this.ocrBusy) {
-                        alert('截图 OCR 进行中，请稍候再清空。');
-                        return;
-                    }
+                    this.activeOCRWorker = null;
+                    this.loading = false;
+                    this.streaming = false;
+                    this.ocrBusy = false;
                     this.studentName = '';
                     this.inputWords = '';
                     this.inputSentencesAndGrammar = '';
