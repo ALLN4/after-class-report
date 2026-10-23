@@ -932,6 +932,12 @@
                     this.ocrStatus = '截图识别版块已刷新，其他模块内容保持不变。';
                 },
 
+                formatWordsForAI() {
+                    return String(this.inputWords || '')
+                        .replace(/([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’\-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’\-]*)*)([一-龥]+)/g, '$1（中文标注：$2）')
+                        .trim();
+                },
+
                 checkMissingWords() {
                     if (!this.inputWords || !this.aiWordsResult) return '';
                     const result = this.aiWordsResult.toLowerCase();
@@ -942,14 +948,15 @@
                     if (entries.length > 20) {
                         return '词汇数量较多（' + entries.length + ' 个），AI 输出可能被截断，建议分两批生成。';
                     }
-                    const clean = (t) => t.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
                     const present = (word) => {
                         const esc = word.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                         return new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`).test(result);
                     };
                     const missing = [];
                     for (const entry of entries) {
-                        const tokens = entry.split(/\s+/).map(clean).filter(t => t !== '');
+                        // 中文可以直接紧跟英文作为标注，例如 apple苹果、take拿走。
+                        // 漏词检查只核对其中的英文部分，避免把中文标注误判为英文词的一部分。
+                        const tokens = entry.match(/[A-Za-zÀ-ÿ]+(?:['’\-][A-Za-zÀ-ÿ]+)*/g) || [];
                         if (tokens.some(t => !present(t))) {
                             missing.push(entry);
                         }
@@ -1145,6 +1152,7 @@
                         '7. 不要使用 Markdown 表格，不要使用代码块包装结果。',
                         '8. 必须严格保留下方四个标记，不要更改标记文字。',
                         '9. 输入可能来自 OCR。不得根据残缺字符、乱码或疑似识别错误推测原词；无法确认的项目必须直接跳过，绝对不得为其编造音标、释义、用法或例句。',
+                        '10. 核心词汇中紧跟英文的中文内容是该词的中文标注，不是英文拼写的一部分；即使中间没有空格，也必须为该英文词生成结果。',
                         '',
                         '【严格输出格式】',
                         '###WORDS_START###',
@@ -1162,7 +1170,7 @@
                         '例句难度：' + this.difficulty,
                         '',
                         '核心词汇：',
-                        this.inputWords.trim() || '无',
+                        this.formatWordsForAI() || '无',
                         '',
                         '重点句型与语法：',
                         this.inputSentencesAndGrammar.trim() || '无'
@@ -1300,7 +1308,7 @@
                     if (!isRefine) {
                         userPrompt = `
 【输入内容】
-核心词汇：${this.inputWords || '无'}
+核心词汇：${this.formatWordsForAI() || '无'}
 重点句型与语法：${this.inputSentencesAndGrammar || '无'}
 `;
                     } else {
