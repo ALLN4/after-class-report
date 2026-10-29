@@ -89,7 +89,7 @@
                 <!-- 学生姓名 -->
                 <section class="flex items-center gap-3">
                     <label class="shrink-0 text-xs font-bold text-gray-800 uppercase tracking-wider">学生姓名</label>
-                    <input type="text" x-model="studentName" placeholder="例如: Leo" class="min-w-0 flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-sm bg-white text-gray-900">
+                    <input type="text" x-ref="studentNameInput" x-model="studentName" placeholder="例如: Leo" class="min-w-0 flex-1 px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-sm bg-white text-gray-900">
                 </section>
 
                 <!-- 课堂表现状态选择 -->
@@ -152,8 +152,9 @@
                                 :disabled="loading || streaming"
                                 :class="loading || streaming ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#5c8a5e] hover:bg-[#4a7c59]'"
                                 class="text-white font-semibold px-4 py-1.5 rounded text-xs transition-all shadow flex items-center gap-1">
-                                <span x-text="copyStatus"></span>
+                                <span x-text="getCopyButtonLabel()"></span>
                             </button>
+                            <button x-show="reportCopied" x-transition type="button" @click="clearForm" class="border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-700 rounded px-3 py-1.5 text-xs font-semibold transition-all whitespace-nowrap">开始下一份</button>
                         </div>
                     </div>
 
@@ -401,6 +402,9 @@
                 freeAIStatusTone: 'text-emerald-700',
 
                 copyStatus: '复制报告文本',
+                reportCopied: false,
+                draftSaveTimer: null,
+                draftReady: false,
                 apiKey: localStorage.getItem('deepseek_api_key') || '',
 
                 saveKey() {
@@ -423,6 +427,9 @@
                 init() {
                     this.refreshPerformanceTags(false);
                     this.pickMonthlyEncouragement();
+                    this.restoreDraft();
+                    this.setupDraftSaving();
+                    this.$nextTick(() => this.focusStudentName());
                     window.addEventListener('keydown', (e) => {
                         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                             e.preventDefault();
@@ -436,6 +443,90 @@
                     });
                     // 直接监听系统粘贴事件：用户按 Ctrl+V 时读取图片，不反复调用剪贴板权限接口。
                     window.addEventListener('paste', (event) => this.handleClipboardPaste(event));
+                },
+
+                focusStudentName() {
+                    if (this.$refs.studentNameInput) this.$refs.studentNameInput.focus();
+                },
+
+                focusStudentNameAfterOCR() {
+                    if (this.studentName.trim()) return;
+                    const active = document.activeElement;
+                    const isEditing = active && (
+                        active.matches('input, textarea, select') || active.isContentEditable
+                    );
+                    if (!isEditing || active === this.$refs.studentNameInput) this.focusStudentName();
+                },
+
+                getDraftData() {
+                    return {
+                        studentName: this.studentName,
+                        inputWords: this.inputWords,
+                        inputSentencesAndGrammar: this.inputSentencesAndGrammar,
+                        aiWordsResult: this.aiWordsResult,
+                        aiSentencesAndGrammarResult: this.aiSentencesAndGrammarResult,
+                        focusVal: this.focusVal,
+                        participationVal: this.participationVal,
+                        readingVal: this.readingVal,
+                        speakingVal: this.speakingVal,
+                        selectedPerformanceTags: this.selectedPerformanceTags,
+                        encouragementText: this.encouragementText,
+                        difficulty: this.difficulty,
+                        savedAt: Date.now()
+                    };
+                },
+
+                restoreDraft() {
+                    try {
+                        const draft = JSON.parse(localStorage.getItem('report_current_draft') || 'null');
+                        if (!draft || typeof draft !== 'object') return;
+                        const fields = [
+                            'studentName', 'inputWords', 'inputSentencesAndGrammar',
+                            'aiWordsResult', 'aiSentencesAndGrammarResult',
+                            'focusVal', 'participationVal', 'readingVal', 'speakingVal',
+                            'encouragementText', 'difficulty'
+                        ];
+                        fields.forEach(field => {
+                            if (typeof draft[field] === 'string') this[field] = draft[field];
+                        });
+                        if (Array.isArray(draft.selectedPerformanceTags)) {
+                            this.selectedPerformanceTags = draft.selectedPerformanceTags.filter(tag => this.performanceTagPool.includes(tag)).slice(0, 4);
+                            this.refreshPerformanceTags(false);
+                        }
+                    } catch (error) {
+                        localStorage.removeItem('report_current_draft');
+                    }
+                },
+
+                setupDraftSaving() {
+                    const fields = [
+                        'studentName', 'inputWords', 'inputSentencesAndGrammar',
+                        'aiWordsResult', 'aiSentencesAndGrammarResult',
+                        'focusVal', 'participationVal', 'readingVal', 'speakingVal',
+                        'selectedPerformanceTags', 'encouragementText', 'difficulty'
+                    ];
+                    fields.forEach(field => this.$watch(field, () => this.scheduleDraftSave()));
+                    this.draftReady = true;
+                },
+
+                scheduleDraftSave() {
+                    if (!this.draftReady) return;
+                    this.reportCopied = false;
+                    window.clearTimeout(this.draftSaveTimer);
+                    this.draftSaveTimer = window.setTimeout(() => {
+                        const draft = this.getDraftData();
+                        const hasContent = draft.studentName.trim() || draft.inputWords.trim() || draft.inputSentencesAndGrammar.trim() || draft.aiWordsResult.trim() || draft.aiSentencesAndGrammarResult.trim();
+                        if (hasContent) localStorage.setItem('report_current_draft', JSON.stringify(draft));
+                        else localStorage.removeItem('report_current_draft');
+                    }, 300);
+                },
+
+                getCopyButtonLabel() {
+                    if (this.reportCopied) return '已复制！';
+                    if (this.loading || this.streaming) return '生成中…';
+                    if (this.checkMissingWords()) return '检查漏词';
+                    if (!this.aiWordsResult && !this.aiSentencesAndGrammarResult) return '复制当前内容';
+                    return '复制报告文本';
                 },
 
                 refreshPerformanceTags(changeEncouragement = true) {
@@ -786,6 +877,7 @@
                         if (runId === this.ocrRunId) {
                             this.ocrBusy = false;
                             this.ocrCurrentPage = 0;
+                            this.$nextTick(() => this.focusStudentNameAfterOCR());
                         }
                     }
                 },
@@ -1443,6 +1535,7 @@ ${scopeLabels[scope] || scopeLabels.smart}
                     this.history = [];
                     this.lastRequest = null;
                     this.copyStatus = '复制报告文本';
+                    this.reportCopied = false;
                     this.showImportPanel = false;
                     this.externalAIText = '';
                     this.freeAIStatus = '';
@@ -1453,11 +1546,19 @@ ${scopeLabels[scope] || scopeLabels.smart}
                     this.togglePreviewFullscreen(false);
                     this.ocrCurrentPage = 0;
                     this.clearScreenshot();
+                    window.clearTimeout(this.draftSaveTimer);
+                    localStorage.removeItem('report_current_draft');
+                    this.$nextTick(() => this.focusStudentName());
                 },
 
                 copyReport() {
                     if (this.streaming) {
                         alert('AI 内容生成中，请稍候再复制。');
+                        return;
+                    }
+                    const missingWords = this.checkMissingWords();
+                    if (missingWords) {
+                        alert(missingWords);
                         return;
                     }
                     if (!this.studentName.trim()) {
@@ -1480,9 +1581,7 @@ ${scopeLabels[scope] || scopeLabels.smart}
                     const text = `[课堂表现评估]\n${this.getCombinedOneLiner()}\n\n[本课核心知识点]\n核心词汇\n${wordsText}\n\n重点句型与语法\n${sentencesText}`;
                     const done = () => {
                         this.copyStatus = '已复制！';
-                        setTimeout(() => {
-                            this.copyStatus = '复制报告文本';
-                        }, 2000);
+                        this.reportCopied = true;
                     };
 
                     const fallbackCopy = (txt) => {
