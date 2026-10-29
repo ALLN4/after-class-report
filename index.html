@@ -140,7 +140,7 @@
                     <!-- 报告展示区域 -->
                     <div class="flex-1 min-h-0 bg-white rounded p-4 text-xs leading-relaxed overflow-y-auto border border-[#e3e8d8]" id="report-text" :style="{ height: previewFullscreen ? 'calc(100vh - 8.5rem)' : null, fontSize: previewFontSize + 'px', fontFamily: 'Segoe UI, DejaVu Sans, Arial, sans-serif' }">
 <section class="mb-4"><div class="text-[11px] font-bold text-emerald-800 bg-emerald-50 border-l-4 border-emerald-500 px-2 py-1 leading-none">[课堂表现评估]</div><div class="whitespace-pre-wrap m-0 leading-snug" x-text="getCombinedOneLiner()"></div></section>
-<section><div class="text-[11px] font-bold text-emerald-800 bg-emerald-50 border-l-4 border-emerald-500 px-2 py-1 mb-2">[本课核心知识点]</div><div class="mb-3"><div class="font-semibold text-gray-700 mb-1">核心词汇</div><div class="whitespace-pre-wrap pl-3" x-text="aiWordsResult ? aiWordsResult : getFallbackWords()"></div></div><div><div class="font-semibold text-gray-700 mb-1">重点句型与语法</div><div class="whitespace-pre-wrap pl-3" x-text="aiSentencesAndGrammarResult ? aiSentencesAndGrammarResult : getFallbackSentencesAndGrammar()"></div></div></section>
+<section><div class="text-[11px] font-bold text-emerald-800 bg-emerald-50 border-l-4 border-emerald-500 px-2 py-1 mb-2">[本课核心知识点]</div><div x-show="inputWords.trim()" class="mb-3"><div class="font-semibold text-gray-700 mb-1">核心词汇</div><div class="whitespace-pre-wrap pl-3" x-text="aiWordsResult ? aiWordsResult : getFallbackWords()"></div></div><div x-show="inputSentencesAndGrammar.trim()"><div class="font-semibold text-gray-700 mb-1">重点句型与语法</div><div class="whitespace-pre-wrap pl-3" x-text="aiSentencesAndGrammarResult ? aiSentencesAndGrammarResult : getFallbackSentencesAndGrammar()"></div></div></section>
 <div x-show="streaming" class="mt-3 pt-2 border-t border-gray-200">
     <div class="text-[10px] text-gray-400 mb-1">✨ 生成中，请稍候…</div>
     <div class="text-xs text-gray-500 whitespace-pre-wrap break-words max-h-40 overflow-y-auto" x-text="streamText"></div>
@@ -1453,15 +1453,19 @@ ${scopeLabels[scope] || scopeLabels.smart}
                         const hasSentences = Boolean(parsed.sentences);
 
                         if (!isRefine) {
-                            if (!hasWords && !hasSentences) {
+                            const expectsWords = Boolean(this.inputWords.trim());
+                            const expectsSentences = Boolean(this.inputSentencesAndGrammar.trim());
+                            const hasExpectedContent = (expectsWords && hasWords) || (expectsSentences && hasSentences);
+                            if (!hasExpectedContent) {
                                 const preview = String(resultText || '').replace(/\s+/g, ' ').slice(0, 160);
                                 this.errorMessage = preview
                                     ? `AI 已返回内容，但格式无法识别：${preview}`
                                     : 'AI 返回为空，可能是模型、网络或接口响应格式问题。请检查模型设置后重试。';
                             } else {
-                                this.aiWordsResult = hasWords ? parsed.words : '• 暂无词汇数据';
-                                this.aiSentencesAndGrammarResult = hasSentences ? parsed.sentences : '• 暂无句型与语法数据';
-                                if (!hasWords || !hasSentences) {
+                                this.aiWordsResult = expectsWords ? (hasWords ? parsed.words : '• 暂无词汇数据') : '';
+                                this.aiSentencesAndGrammarResult = expectsSentences ? (hasSentences ? parsed.sentences : '• 暂无句型与语法数据') : '';
+                                const missingExpectedContent = (expectsWords && !hasWords) || (expectsSentences && !hasSentences);
+                                if (missingExpectedContent) {
                                     this.errorMessage = 'AI 只返回了部分内容，已保留成功解析的部分。点击重试可再次生成。';
                                 }
                             }
@@ -1577,9 +1581,16 @@ ${scopeLabels[scope] || scopeLabels.smart}
                         }
                     }
 
-                    const wordsText = this.aiWordsResult ? this.aiWordsResult : this.getFallbackWords();
-                    const sentencesText = this.aiSentencesAndGrammarResult ? this.aiSentencesAndGrammarResult : this.getFallbackSentencesAndGrammar();
-                    const text = `[课堂表现评估]\n${this.getCombinedOneLiner()}\n\n[本课核心知识点]\n核心词汇\n${wordsText}\n\n重点句型与语法\n${sentencesText}`;
+                    const knowledgeParts = [];
+                    if (this.inputWords.trim()) {
+                        const wordsText = this.aiWordsResult ? this.aiWordsResult : this.getFallbackWords();
+                        knowledgeParts.push(`核心词汇\n${wordsText}`);
+                    }
+                    if (this.inputSentencesAndGrammar.trim()) {
+                        const sentencesText = this.aiSentencesAndGrammarResult ? this.aiSentencesAndGrammarResult : this.getFallbackSentencesAndGrammar();
+                        knowledgeParts.push(`重点句型与语法\n${sentencesText}`);
+                    }
+                    const text = `[课堂表现评估]\n${this.getCombinedOneLiner()}\n\n[本课核心知识点]\n${knowledgeParts.join('\n\n')}`;
                     const done = () => {
                         this.copyStatus = '已复制！';
                         this.reportCopied = true;
