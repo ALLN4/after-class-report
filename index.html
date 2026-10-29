@@ -274,19 +274,18 @@
                             <button @click="undoLast" x-show="history.length > 0" :disabled="loading" class="text-[11px] font-bold px-2.5 py-1 rounded transition-all shadow border border-gray-300 text-gray-600 hover:bg-gray-100">↩ 撤销上次修改</button>
                         </div>
                     </div>
-                    <div class="flex gap-2">
-                        <select x-model="refineScope" class="w-36 shrink-0 px-2 py-1.5 border border-emerald-200 rounded bg-white text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#4a7c59]">
-                            <option value="smart">智能判断</option>
-                            <option value="word_meaning">词汇：释义</option>
-                            <option value="word_example">词汇：例句</option>
-                            <option value="word_usage">词汇：用法与搭配</option>
-                            <option value="specific_word">指定词汇</option>
-                            <option value="sentence_example">句型：例句</option>
-                            <option value="grammar_explanation">句型：语法解说</option>
-                            <option value="sentence_usage">句型：结构与用法</option>
-                            <option value="specific_sentence">指定句型或语法点</option>
-                            <option value="all">全部内容</option>
-                        </select>
+                    <div class="flex gap-2 items-start">
+                        <div class="relative w-40 shrink-0" @click.outside="showRefineScopes = false">
+                            <button type="button" @click="showRefineScopes = !showRefineScopes" :class="showRefineScopes ? 'border-[#4a7c59] ring-1 ring-[#4a7c59]' : 'border-emerald-200'" class="w-full flex items-center justify-between gap-2 rounded border bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:outline-none">
+                                <span x-text="getRefineScopeLabel()"></span>
+                                <span class="text-[9px] text-gray-400">▲</span>
+                            </button>
+                            <div x-show="showRefineScopes" x-transition class="absolute bottom-full left-0 z-30 mb-1 w-52 overflow-hidden rounded border border-emerald-200 bg-white shadow-lg">
+                                <template x-for="option in refineScopeOptions" :key="option.value">
+                                    <button type="button" @click="refineScope = option.value; showRefineScopes = false" :class="refineScope === option.value ? 'bg-[#e4f2e7] text-[#2d6540]' : 'text-gray-600 hover:bg-emerald-50'" class="block w-full px-3 py-1.5 text-left text-[11px] transition-colors" x-text="option.label"></button>
+                                </template>
+                            </div>
+                        </div>
                         <textarea x-model="refineInstruction" rows="1" placeholder="例如：只把 take off 的例句改简单，其他内容不动。" class="flex-1 min-w-0 px-3 py-1.5 border border-emerald-200 rounded focus:outline-none focus:ring-1 focus:ring-[#4a7c59] text-xs font-sans bg-white text-gray-900"></textarea>
                     </div>
                 </section>
@@ -377,6 +376,19 @@
 
                 refineInstruction: '',
                 refineScope: 'smart',
+                showRefineScopes: false,
+                refineScopeOptions: [
+                    { value: 'smart', label: '智能判断' },
+                    { value: 'word_meaning', label: '词汇：释义' },
+                    { value: 'word_example', label: '词汇：例句' },
+                    { value: 'word_usage', label: '词汇：用法与搭配' },
+                    { value: 'specific_word', label: '指定词汇' },
+                    { value: 'sentence_example', label: '句型：例句' },
+                    { value: 'grammar_explanation', label: '句型：语法解说' },
+                    { value: 'sentence_usage', label: '句型：结构与用法' },
+                    { value: 'specific_sentence', label: '指定句型或语法点' },
+                    { value: 'all', label: '全部内容' }
+                ],
                 difficulty: localStorage.getItem('report_difficulty') || '简单',
                 model: ['deepseek-chat', 'deepseek-reasoner'].includes(localStorage.getItem('report_model'))
                     ? localStorage.getItem('report_model')
@@ -528,6 +540,10 @@
                     if (this.checkMissingWords()) return '检查漏词';
                     if (!this.aiWordsResult && !this.aiSentencesAndGrammarResult) return '复制当前内容';
                     return '复制报告文本';
+                },
+
+                getRefineScopeLabel() {
+                    return this.refineScopeOptions.find(option => option.value === this.refineScope)?.label || '智能判断';
                 },
 
                 refreshPerformanceTags(changeEncouragement = true) {
